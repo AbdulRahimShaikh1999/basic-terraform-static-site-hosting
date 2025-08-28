@@ -3,7 +3,6 @@ locals {
   error_doc = "error.html"
 }
 
-# random suffix so bucket name is globally unique
 resource "random_id" "suffix" {
   byte_length = 3
 }
@@ -12,14 +11,13 @@ locals {
   bucket_name = "static-site-${random_id.suffix.hex}"
 }
 
-# 1) create the S3 bucket
 resource "aws_s3_bucket" "site" {
   bucket        = local.bucket_name
-  force_destroy = true   # allows terraform destroy even if objects exist
+  force_destroy = true   
   tags          = var.project_tags
 }
 
-# 2) enforce bucket-owner-only object ownership (no ACL headaches)
+
 resource "aws_s3_bucket_ownership_controls" "this" {
   bucket = aws_s3_bucket.site.id
   rule {
@@ -27,7 +25,7 @@ resource "aws_s3_bucket_ownership_controls" "this" {
   }
 }
 
-# 3) allow public policies but block ACLs (modern safe config)
+
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket                  = aws_s3_bucket.site.id
   block_public_acls       = true
@@ -36,7 +34,7 @@ resource "aws_s3_bucket_public_access_block" "this" {
   restrict_public_buckets = false
 }
 
-# 4) static website configuration
+
 resource "aws_s3_bucket_website_configuration" "this" {
   bucket = aws_s3_bucket.site.id
 
@@ -54,7 +52,7 @@ resource "aws_s3_bucket_website_configuration" "this" {
   ]
 }
 
-# 5) bucket policy for public GET access
+
 data "aws_iam_policy_document" "public_read" {
   statement {
     sid     = "PublicReadGetObject"
@@ -68,6 +66,7 @@ data "aws_iam_policy_document" "public_read" {
 
     resources = ["${aws_s3_bucket.site.arn}/*"]
   }
+
 }
 
 resource "aws_s3_bucket_policy" "public" {
@@ -76,7 +75,6 @@ resource "aws_s3_bucket_policy" "public" {
   depends_on = [aws_s3_bucket_public_access_block.this]
 }
 
-# helpful outputs
 output "bucket_name" {
   value = aws_s3_bucket.site.bucket
 }
@@ -86,10 +84,7 @@ output "website_endpoint" {
 }
 
 
-##########
 
-
-# Upload index.html via Terraform
 resource "aws_s3_object" "index" {
   bucket       = aws_s3_bucket.site.id
   key          = local.index_doc
@@ -106,7 +101,6 @@ resource "aws_s3_object" "index" {
   ]
 }
 
-# Upload error.html via Terraform
 resource "aws_s3_object" "error" {
   bucket       = aws_s3_bucket.site.id
   key          = local.error_doc
